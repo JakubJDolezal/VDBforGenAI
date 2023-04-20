@@ -6,9 +6,9 @@ VDBforGenAI is a Python package for building vector databases of text for use in
 
 To use VDBforGenAI, first install the package and its dependencies:
 
-
+```
 pip install git+https://github.com/JakubJDolezal/VDBforGenAI.git
-
+```
 Next, create an instance of the VectorDatabase class by passing in a list of strings, which represent the context you care about. Each string can contain multiple sentences.
 
 
