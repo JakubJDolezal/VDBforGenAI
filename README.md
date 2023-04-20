@@ -53,23 +53,24 @@ VDBforGenAI is licensed under the MIT License.
 #More Usage -
 ##How to add new strings
 
-from VDBforGenAI import VectorDatabase
 
-### Create a VectorDatabase object with an initial list of strings
-{
+
+## Create a VectorDatabase object with an initial list of strings
+```
+from VDBforGenAI import VectorDatabase
 initial_strings = [
     "This is the first sentence. This is the second sentence.",
     "This is another string with multiple sentences. Here's another sentence.",
     "And here's yet another string with multiple sentences. This one has three sentences!"
 ]
 vdb = VectorDatabase(initial_strings)
-}
-### Add a new string with multiple sentences using the add_string_to_context method
+```
+Add a new string with multiple sentences using the add_string_to_context method
 ```
 new_string = "This is a new string with three sentences. Here's the second sentence. And here's the third!"
 vdb.add_string_to_context(new_string)
 ```
-### Add a new list of strings with multiple sentences using the add_list_of_strings_to_context method
+Add a new list of strings with multiple sentences using the add_list_of_strings_to_context method
 ```
 new_list = [
     "This is a new string with two sentences. Here's the second sentence.",
@@ -77,7 +78,7 @@ new_list = [
 ]
 vdb.add_list_of_strings_to_context(new_list)
 ```
-##Passing an encoder and tokenizer from Hugging Face's Transformers library:
+## Passing an encoder and tokenizer from Hugging Face's Transformers library:
 
 
 ```
@@ -92,4 +93,4 @@ encoder = AutoModel.from_pretrained('bert-base-uncased')
 vdb = VectorDatabase(['some text'], encoder=encoder, tokenizer=tokenizer)
 
 ```
-Similarly you can pass your own encoder as a torch model.
+Similarly, you can pass your own encoder as a torch model.
