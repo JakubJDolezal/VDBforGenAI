@@ -10,7 +10,8 @@ from VectorisationAndIndexCreation import SearchFunctions
 import transformers as transformers
 import re
 import numpy as np
-
+import os
+import glob
 
 class VectorDatabase:
     def __init__(self,
@@ -237,6 +238,17 @@ class VectorDatabase:
         else:
             self.add_string_to_context(word_string)
 
+    def load_txt(self, filename, divide_by_filepath=True):
+        with open('file.txt', 'r') as f:
+            # read contents of file as a string
+            txt_string = f.read()
+        if divide_by_filepath:
+            filename_divided = split_string_to_dict(filename)
+            self.add_to_dlv(filename_divided)
+            self.add_string_to_context(txt_string)
+        else:
+            self.add_string_to_context(txt_string)
+
     def load_string_list_with_divisions(self, string_list, divisions):
         for i in range(0, len(string_list)):
             self.add_to_dlv(divisions[i])
@@ -250,6 +262,35 @@ class VectorDatabase:
         for item in list_of_filenames:
             self.load_docx(item, divide_by_filepath)
 
+    def load_txt_list(self, list_of_filenames, divide_by_filepath=True):
+        for item in list_of_filenames:
+            self.load_txt(item, divide_by_filepath)
+
+    def load_all_in_directory(self,directory):
+        docx_docs = []
+        doc_docs = []
+        txt_docs = []
+        pdf_docs = []
+
+        # loop through all files and subdirectories
+        for root, dirs, files in os.walk(directory):
+            # find all docx/doc files in current directory
+            for file in files:
+                if file.endswith('.docx'):
+                    docx_docs.append(os.path.join(root, file))
+                elif file.endswith('.doc'):
+                    doc_docs.append(os.path.join(root, file))
+                # find all txt files in current directory
+                elif file.endswith('.txt'):
+                    txt_docs.append(os.path.join(root, file))
+                # find all pdf files in current directory
+                elif file.endswith('.pdf'):
+                    pdf_docs.append(os.path.join(root, file))
+        self.load_pdf_list(docx_docs)
+        self.load_docx_list(pdf_docs)
+        self.load_docx_list(pdf_docs)
+
+
     def add_to_dlv(self, filename_divided):
         if self.dlv is None:
             self.make_dlv_base()
@@ -258,12 +299,16 @@ class VectorDatabase:
                 self.add_dlv_level(i)
             if filename_divided[i] not in self.list_dict_value_num[i].keys():
                 self.list_dict_value_num[i][filename_divided[i]] = len(self.list_dict_value_num[i].keys())
-            self.dlv[i] = np.cat(self.dlv[i], np.array(self.list_dict_value_num[i][filename_divided[i]]))
+        for i in self.dlv.keys():
+            if i not in filename_divided.keys():
+                self.dlv[i] = np.cat(self.dlv[i], np.array(-1))
+            else:
+                self.dlv[i] = np.cat(self.dlv[i], np.array(self.list_dict_value_num[i][filename_divided[i]]))
 
     def make_dlv_base(self):
         self.dlv = {}
         self.list_dict_value_num = {}
 
     def add_dlv_level(self, i):
-        self.dlv[i] = np.zeros(len(self.list_of_lists_of_strings)) - 1
+        self.dlv[i] = np.zeros(len(self.list_of_lists_of_strings))-1
         self.list_dict_value_num[i] = {}
