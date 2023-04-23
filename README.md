@@ -50,8 +50,8 @@ License
 
 VDBforGenAI is licensed under the MIT License.
 
-#More Usage -
-##How to add new strings
+# More Usage -
+## How to add new strings
 
 
 
