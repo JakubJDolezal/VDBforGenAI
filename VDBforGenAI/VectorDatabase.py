@@ -72,17 +72,17 @@ class VectorDatabase:
             indices_returned = SearchFunctions.search_database(self.list_of_context_vectors_flattened, self.encoder,
                                                                self.tokenizer, text, num_samples=num_context)
         if num_context == 1:
-            return self.list_of_lists_of_strings[self.map_to_list_of_lists[indices_returned[0][0]]][
-                self.map_to_list_of_lists_index[indices_returned[0][0]]]
+            return self.list_of_lists_of_strings[int(self.map_to_list_of_lists[int(indices_returned)])][int(
+                self.map_to_list_of_lists_index[int(indices_returned)])]
         else:
             list_of_returned_contexts = [
-                self.list_of_lists_of_strings[self.map_to_list_of_lists[indices_returned[0][i]]][
-                    self.map_to_list_of_lists_index[indices_returned[0][i]]] for i in
+                self.list_of_lists_of_strings[int(self.map_to_list_of_lists[indices_returned[i]])][
+                    int(self.map_to_list_of_lists_index[indices_returned[i]])] for i in
                 range(num_context)]
-        return ' '.join(list_of_returned_contexts)
+            return ' '.join(list_of_returned_contexts)
 
     def get_context_from_index(self, text: str, loc_index: faiss.Index, selection_map_to_list_of_lists: numpy.array,
-                               selection_map_to_list_of_lists_index: numpy.arra, num_context: int = 1):
+                               selection_map_to_list_of_lists_index: numpy.array, num_context: int = 1):
         """
 
         :param selection_map_to_list_of_lists_index: the selection mapping to the index within each specific document
@@ -95,14 +95,14 @@ class VectorDatabase:
         indices_returned = SearchFunctions.search_database(None, self.encoder, self.tokenizer, text,
                                                            num_samples=num_context, index=loc_index)
         if num_context == 1:
-            return self.list_of_lists_of_strings[selection_map_to_list_of_lists[indices_returned[0][0]]][
-                selection_map_to_list_of_lists_index[indices_returned[0][0]]]
+            return self.list_of_lists_of_strings[int(selection_map_to_list_of_lists[int(indices_returned)])][int(
+                selection_map_to_list_of_lists_index[int(indices_returned)])]
         else:
             list_of_returned_contexts = [
-                self.list_of_lists_of_strings[selection_map_to_list_of_lists[indices_returned[0][i]]][
-                    selection_map_to_list_of_lists_index[indices_returned[0][i]]] for i in
+                self.list_of_lists_of_strings[int(selection_map_to_list_of_lists[indices_returned[i]])][
+                    int(selection_map_to_list_of_lists_index[indices_returned[i]])] for i in
                 range(num_context)]
-        return ' '.join(list_of_returned_contexts)
+            return ' '.join(list_of_returned_contexts)
 
     def get_index_and_context_from_selection(self, text: str, level: int, key: int, num_context=1):
         """
@@ -113,10 +113,10 @@ class VectorDatabase:
         :param num_context: how many instances of context you want
         :return: string of context
         """
-        selection = self.dlv == self.list_dict_value_num[level][key]
-        selection_map_to_list_of_lists = self.map_to_list_of_lists[selection]
-        selection_map_to_list_of_lists_index = self.map_to_list_of_lists_index[selection]
-        selection_list_of__context_vectors_flattened = self.list_of_context_vectors_flattened[selection]
+        selection = self.dlv[level] == self.list_dict_value_num[level][key]
+        selection_map_to_list_of_lists = self.map_to_list_of_lists[np.isin(self.map_to_list_of_lists,np.argwhere(selection))]
+        selection_map_to_list_of_lists_index = self.map_to_list_of_lists_index[np.isin(self.map_to_list_of_lists,np.argwhere(selection))]
+        selection_list_of__context_vectors_flattened = self.list_of_context_vectors_flattened[np.isin(self.map_to_list_of_lists,np.argwhere(selection))]
         loc_index = faiss.IndexFlatIP(self.d)
         loc_index.add(selection_list_of__context_vectors_flattened)
         return self.get_context_from_index(text, loc_index, selection_map_to_list_of_lists,
@@ -295,16 +295,19 @@ class VectorDatabase:
     def add_to_dlv(self, filename_divided):
         if self.dlv is None:
             self.make_dlv_base()
+        done=[]
         for i in filename_divided.keys():
             if i not in self.dlv.keys():
                 self.add_dlv_level(i)
+                done.append(i)
             if filename_divided[i] not in self.list_dict_value_num[i].keys():
                 self.list_dict_value_num[i][filename_divided[i]] = len(self.list_dict_value_num[i].keys())
         for i in self.dlv.keys():
-            if i not in filename_divided.keys():
-                self.dlv[i] = np.concatenate((self.dlv[i], np.array([-1])))
-            else:
-                self.dlv[i] = np.concatenate((self.dlv[i], np.array([self.list_dict_value_num[i][filename_divided[i]]])))
+            if i not in done:
+                if i not in filename_divided.keys():
+                    self.dlv[i] = np.concatenate((self.dlv[i], np.array([-1])))
+                else:
+                    self.dlv[i] = np.concatenate((self.dlv[i], np.array([self.list_dict_value_num[i][filename_divided[i]]])))
 
     def make_dlv_base(self):
         self.dlv = {}

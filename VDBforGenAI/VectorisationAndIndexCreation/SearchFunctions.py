@@ -4,7 +4,7 @@ import torch
 import transformers as transformers
 
 
-def search_database(search_vectors: torch.tensor,
+def search_database(search_vectors: numpy.array,
                     encoder: transformers.PreTrainedModel,
                     tokenizer: transformers.PreTrainedTokenizer,
                     text: str,
@@ -21,7 +21,7 @@ def search_database(search_vectors: torch.tensor,
     :return: positions:positions from you document that match the query most closely
     """
     if index is None:
-        d = encoder.config.hidden_size()
+        d = encoder.config.hidden_size
         index = faiss.IndexFlatIP(d)
         index.add(search_vectors)
     encoder.eval()
@@ -29,11 +29,11 @@ def search_database(search_vectors: torch.tensor,
         text,
         max_length=512,
         return_tensors='pt')
-    ids = data['inputs_ids'].to(encoder.device)
+    ids = data['input_ids'].to(encoder.device)
     mask = data['attention_mask'].to(encoder.device)
     with torch.no_grad():
         vector = encoder(ids, mask)
-    _, indices = index.search(vector[0].numpy(), num_samples)
+    _, indices = index.search(vector[1].numpy(), num_samples)
     return indices[0][:num_samples]
 
 
