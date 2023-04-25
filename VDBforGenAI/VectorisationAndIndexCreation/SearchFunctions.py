@@ -56,14 +56,19 @@ def vectorise_to_numpy(
         text = input_strings[i:i + batch_size]
         data = tokenizer.batch_encode_plus(
             text,
+            padding=True,
+            truncation=True,
             max_length=512,
             return_tensors='pt')
-        ids = data['inputs_ids'].to(encoder.device)
+        ids = data['input_ids'].to(encoder.device)
         mask = data['attention_mask'].to(encoder.device)
         with torch.no_grad():
             vectors = encoder(ids, mask)
-        all_embeddings.append(vectors)
+        all_embeddings.append(vectors[1])
 
     # Concatenate the embeddings for all batches
-    all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
+    if batch_size<len(input_strings):
+        all_embeddings = all_embeddings[0].numpy()
+    else:
+        all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
     return all_embeddings

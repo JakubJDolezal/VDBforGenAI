@@ -1,17 +1,16 @@
 from __future__ import annotations
 import faiss
 import numpy
-from transformers import AutoTokenizer, XLMRobertaModel, AutoModel
+from transformers import AutoTokenizer, AutoModel
 from typing import Union
 
-import Utilities.Loading
-from Utilities.StringUtilities import split_string_to_dict
-from VectorisationAndIndexCreation import SearchFunctions
+from VDBforGenAI.Utilities.StringUtilities import split_string_to_dict
+from VDBforGenAI.VectorisationAndIndexCreation import SearchFunctions
 import transformers as transformers
 import re
 import numpy as np
 import os
-import glob
+
 
 class VectorDatabase:
     def __init__(self,
@@ -19,7 +18,6 @@ class VectorDatabase:
                  tokenizer: Union[str, transformers.PreTrainedTokenizer] = None,
                  batch_size: int = 128,
                  splitting_choice: str = "paragraphs",
-                 preload_index: bool = True
                  ):
         """
 
@@ -48,17 +46,13 @@ class VectorDatabase:
                 self.encoder = encoder
                 self.tokenizer = tokenizer
         else:
-            self.encoder = XLMRobertaModel.from_pretrained("xlm-roberta-base")
-            self.tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base")
-        self.d = self.encoder.config.hidden_size()
+            self.encoder = AutoModel.from_pretrained("sentence-transformers/all-mpnet-base-v2")
+            self.tokenizer = AutoTokenizer.from_pretrained('sentence-transformers/all-mpnet-base-v2')
+        self.d = self.encoder.config.hidden_size
 
         self.batch_size = batch_size
         self.splitting_choice = splitting_choice
-
-        if preload_index:
-            self.reload_total_index()
-        else:
-            self.index_loaded = False
+        self.index_loaded = False
 
     def reload_total_index(self):
         self.index = faiss.IndexFlatIP(self.d)
@@ -133,17 +127,19 @@ class VectorDatabase:
             preload_index = self.index_loaded
         if self.list_of_lists_of_strings is None:
             self.initial_string_addition([string])
-        previous_length = len(self.list_of_lists_of_strings)
-        self.list_of_lists_of_strings.append(self.split_string_into_list_of_strings([string]))
-        self.map_to_list_of_lists = np.concatenate(
-            [self.map_to_list_of_lists, np.repeat(previous_length, len(self.list_of_lists_of_strings[-1]))])
-        self.map_to_list_of_lists_index = np.concatenate(
-            [self.map_to_list_of_lists_index, np.linspace(0, previous_length, num=previous_length, endpoint=False)])
-        vector_list_of_string = SearchFunctions.vectorise_to_numpy(self.encoder, self.tokenizer,
-                                                                   self.list_of_lists_of_strings[-1],
-                                                                   batch_size=self.batch_size)
-        self.list_of_context_vectors_flattened = np.concatenate([self.list_of_context_vectors_flattened,
-                                                                 vector_list_of_string], axis=0)
+        else:
+            previous_length = len(self.list_of_lists_of_strings)
+            self.list_of_lists_of_strings.extend(self.split_string_into_list_of_strings([string]))
+            self.map_to_list_of_lists = np.concatenate(
+                [self.map_to_list_of_lists, np.repeat(previous_length, len(self.list_of_lists_of_strings[-1]))])
+            self.map_to_list_of_lists_index = np.concatenate(
+                [self.map_to_list_of_lists_index, np.linspace(0, len(self.list_of_lists_of_strings[-1]),
+                                                              num=len(self.list_of_lists_of_strings[-1]), endpoint=False)])
+            vector_list_of_string = SearchFunctions.vectorise_to_numpy(self.encoder, self.tokenizer,
+                                                                       self.list_of_lists_of_strings[-1],
+                                                                       batch_size=self.batch_size)
+            self.list_of_context_vectors_flattened = np.concatenate([self.list_of_context_vectors_flattened,
+                                                                     vector_list_of_string], axis=0)
         if preload_index:
             self.reload_total_index()
         else:
@@ -209,43 +205,48 @@ class VectorDatabase:
                 sentences = re.findall(r".*?[.?!\n]+(?=\s|$|[A-Z])", s, re.DOTALL)
                 # Remove empty strings and add the list of sentences to the result
                 result.append([sentence.strip() for sentence in sentences if sentence.strip()])
+            # Remove any empty sub-lists from the result list
+            result = [x for x in result if x]
             return result
         elif self.splitting_choice == "paragraphs":
             paragraphs_list = []
             for string in input_list:
                 paragraphs = string.split('\n')  # Split the string into paragraphs using newline as delimiter
-                paragraphs_list.append(paragraphs)
+                # Remove empty strings and add the list of paragraphs to the result
+                paragraphs_list.append([paragraph.strip() for paragraph in paragraphs if paragraph.strip()])
+            # Remove any empty sub-lists from the result list
+            paragraphs_list = [x for x in paragraphs_list if x]
             return paragraphs_list
         else:
             # Return the input list as is but make into list of lists of single strings for consistency, i.e. whole documents
             return [[input_list[i]] for i in range(0, len(input_list))]
 
     def load_pdf(self, filename, divide_by_filepath=None):
-        pdf_string = Utilities.Loading.load_pdf(filename)
+        pdf_string = VectorDatabase.Utilities.Loading.load_pdf(filename)
         if divide_by_filepath:
             filename_divided = split_string_to_dict(filename)
             self.add_to_dlv(filename_divided)
-            self.add_string_to_context(pdf_string)
+            self.add_string_to_context(pdf_string , dlv_handled=True)
         else:
             self.add_string_to_context(pdf_string)
 
     def load_docx(self, filename, divide_by_filepath=True):
-        word_string = Utilities.Loading.load_docx(filename)
+        word_string = VectorDatabase.Utilities.Loading.load_docx(filename)
         if divide_by_filepath:
             filename_divided = split_string_to_dict(filename)
             self.add_to_dlv(filename_divided)
-            self.add_string_to_context(word_string)
+            self.add_string_to_context(word_string , dlv_handled=True)
         else:
             self.add_string_to_context(word_string)
 
     def load_txt(self, filename, divide_by_filepath=True):
-        with open('file.txt', 'r') as f:
+        with open(filename, 'r') as f:
             # read contents of file as a string
             txt_string = f.read()
         if divide_by_filepath:
             filename_divided = split_string_to_dict(filename)
+            self.add_string_to_context(txt_string, dlv_handled=True)
             self.add_to_dlv(filename_divided)
-            self.add_string_to_context(txt_string)
         else:
             self.add_string_to_context(txt_string)
 
@@ -288,7 +289,7 @@ class VectorDatabase:
                     pdf_docs.append(os.path.join(root, file))
         self.load_pdf_list(docx_docs)
         self.load_docx_list(pdf_docs)
-        self.load_docx_list(pdf_docs)
+        self.load_txt_list(txt_docs)
 
 
     def add_to_dlv(self, filename_divided):
@@ -301,14 +302,18 @@ class VectorDatabase:
                 self.list_dict_value_num[i][filename_divided[i]] = len(self.list_dict_value_num[i].keys())
         for i in self.dlv.keys():
             if i not in filename_divided.keys():
-                self.dlv[i] = np.cat(self.dlv[i], np.array(-1))
+                self.dlv[i] = np.concatenate((self.dlv[i], np.array([-1])))
             else:
-                self.dlv[i] = np.cat(self.dlv[i], np.array(self.list_dict_value_num[i][filename_divided[i]]))
+                self.dlv[i] = np.concatenate((self.dlv[i], np.array([self.list_dict_value_num[i][filename_divided[i]]])))
 
     def make_dlv_base(self):
         self.dlv = {}
         self.list_dict_value_num = {}
 
     def add_dlv_level(self, i):
-        self.dlv[i] = np.zeros(len(self.list_of_lists_of_strings))-1
-        self.list_dict_value_num[i] = {}
+        if len(self.list_of_lists_of_strings)==1:
+            self.dlv[i] = np.zeros(1)
+            self.list_dict_value_num[i] = {}
+        else:
+            self.dlv[i] = np.zeros(len(self.list_of_lists_of_strings))-1
+            self.list_dict_value_num[i] = {}

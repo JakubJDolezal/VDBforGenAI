@@ -1,0 +1,5 @@
+This is a sentence. This is another.
+
+Example of another sentence.
+
+This package was not made by Jakub Dolezal.

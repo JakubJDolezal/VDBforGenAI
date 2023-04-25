@@ -1,3 +1,4 @@
+import re
 def split_string_to_dict(s):
     """
     Splits a string into a dictionary where the keys are indices and the values are the corresponding substrings
@@ -10,7 +11,7 @@ def split_string_to_dict(s):
     - result_dict (dict): A dictionary where each key is an integer representing the index of the substring in the
     input string, and the corresponding value is the substring itself.
     """
-    split_list = s.split('/')  # Split the input string into a list of substrings separated by '/' characters
+    split_list = re.split(r'/|\\',s)  # Split the input string into a list of substrings separated by '/' characters
     result_dict = {}  # Initialize an empty dictionary to store the resulting key-value pairs
     for i in range(len(split_list) - 1):  # Iterate over the indices of the substrings in the split list
         result_dict[i] = split_list[i]  # Add a new key-value pair to the dictionary for each substring
