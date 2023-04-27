@@ -10,7 +10,7 @@ import transformers as transformers
 import re
 import numpy as np
 import os
-
+from VDBforGenAI.Utilities.Loading import load_docx, load_pdf
 
 class VectorDatabase:
     def __init__(self,
@@ -222,20 +222,20 @@ class VectorDatabase:
             return [[input_list[i]] for i in range(0, len(input_list))]
 
     def load_pdf(self, filename, divide_by_filepath=None):
-        pdf_string = VectorDatabase.Utilities.Loading.load_pdf(filename)
+        pdf_string = load_pdf(filename)
         if divide_by_filepath:
             filename_divided = split_string_to_dict(filename)
-            self.add_to_dlv(filename_divided)
             self.add_string_to_context(pdf_string , dlv_handled=True)
+            self.add_to_dlv(filename_divided)
         else:
             self.add_string_to_context(pdf_string)
 
     def load_docx(self, filename, divide_by_filepath=True):
-        word_string = VectorDatabase.Utilities.Loading.load_docx(filename)
+        word_string = load_docx(filename)
         if divide_by_filepath:
             filename_divided = split_string_to_dict(filename)
-            self.add_to_dlv(filename_divided)
             self.add_string_to_context(word_string , dlv_handled=True)
+            self.add_to_dlv(filename_divided)
         else:
             self.add_string_to_context(word_string)
 
@@ -287,8 +287,8 @@ class VectorDatabase:
                 # find all pdf files in current directory
                 elif file.endswith('.pdf'):
                     pdf_docs.append(os.path.join(root, file))
-        self.load_pdf_list(docx_docs)
-        self.load_docx_list(pdf_docs)
+        self.load_pdf_list(pdf_docs)
+        self.load_docx_list(docx_docs)
         self.load_txt_list(txt_docs)
 
 
