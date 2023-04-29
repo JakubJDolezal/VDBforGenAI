@@ -37,7 +37,6 @@ Dependencies
 
 VDBforGenAI has the following dependencies:
 ```
-
     Faiss
     Transformers
     Torch
