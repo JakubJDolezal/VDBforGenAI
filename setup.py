@@ -17,13 +17,13 @@ setup(
 	packages=find_packages('.'),
 	# Start with a small number and increase it with 
 	# every change you make https://semver.org 
-	version='0.1',
+	version='0.2',
 	# Chose a license from here: https: // 
 	# help.github.com / articles / licensing - a - 
 	# repository. For example: MIT 
 	license='',
 	# Short description of your library 
-	description='A package for generating and querying Vector Databases for Genomic Data using AI',
+	description='A simple package for generating and querying Vector Databases for Generative AI as well any other reason',
 	# Long description of your library 
 	long_description=long_description,
 	long_description_content_type='text/markdown',
@@ -36,7 +36,8 @@ setup(
 	# List of keywords 
 	keywords=[],
 	# List of packages to install with this one 
-	install_requires=[  "faiss-cpu",
+	install_requires=[
+		"faiss-cpu",
         "transformers",
         "torch",
         "numpy","PyPDF2",'docx','python-docx'],

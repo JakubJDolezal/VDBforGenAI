@@ -1,5 +1,6 @@
 from __future__ import annotations
 import faiss
+import numpy
 import torch
 import transformers as transformers
 
@@ -8,6 +9,7 @@ def search_database(search_vectors: numpy.array,
                     encoder: transformers.PreTrainedModel,
                     tokenizer: transformers.PreTrainedTokenizer,
                     text: str,
+                    index_of_summarised_vector: int,
                     num_samples: int = 2,
                     index: faiss.Index = None):
     """
@@ -33,7 +35,7 @@ def search_database(search_vectors: numpy.array,
     mask = data['attention_mask'].to(encoder.device)
     with torch.no_grad():
         vector = encoder(ids, mask)
-    _, indices = index.search(vector[1].numpy(), num_samples)
+    _, indices = index.search(vector[index_of_summarised_vector].numpy(), num_samples)
     return indices[0][:num_samples]
 
 
@@ -41,7 +43,8 @@ def vectorise_to_numpy(
         encoder: transformers.PreTrainedModel,
         tokenizer: transformers.PreTrainedTokenizer,
         input_strings: list,
-        batch_size: int):
+        batch_size: int,
+        index_of_summarised_vector: int):
     """
 
     :param encoder: The encoder you are using
@@ -64,10 +67,10 @@ def vectorise_to_numpy(
         mask = data['attention_mask'].to(encoder.device)
         with torch.no_grad():
             vectors = encoder(ids, mask)
-        all_embeddings.append(vectors[1])
+        all_embeddings.append(vectors[index_of_summarised_vector])
 
     # Concatenate the embeddings for all batches
-    if batch_size<len(input_strings):
+    if batch_size < len(input_strings):
         all_embeddings = all_embeddings[0].numpy()
     else:
         all_embeddings = torch.cat(all_embeddings, dim=0).numpy()

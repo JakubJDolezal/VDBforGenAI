@@ -6,42 +6,49 @@ VDBforGenAI is a Python package for building vector databases of text for use in
 
 To use VDBforGenAI, first install the package and its dependencies:
 
-```
+```commandline
 pip install git+https://github.com/JakubJDolezal/VDBforGenAI.git
 ```
 Next, create an instance of the VectorDatabase class by passing in a list of strings, which represent the context you care about. Each string can contain multiple sentences.
 
 
 ## Minimal example
-```
-from VDBforGenAI import VectorDatabase
+You instantiate a database and then tell it where to load
+```python
+from VDBforGenAI.VectorDatabase import VectorDatabase
 
-list_of_strings = [
-    "I am a sentence. This is another sentence in the same string.",
-    "This is a new string with multiple sentences. The quick brown fox jumps over the lazy dog. The end."
-]
+vdb = VectorDatabase(splitting_choice="length")
+vdb.load_all_in_directory('./ExampleFolder')
 
-vdb = VectorDatabase(list_of_strings)
+
 ```
 Once you have a VectorDatabase instance, you can use the get_context_from_entire_database method to retrieve the context that is most similar to a given input text.
 
-```
-context = vdb.get_context_from_entire_database("brown fox jumps")
+```python
+context = vdb.get_context_from_entire_database('What does parma ham go well with?')
 
 print(context)
 ```
+This retrieves the most similar piece of text to "What does parma ham go well with?" from your indexed directory
+You can also specify which level and which directory on that level you wish to search
+```python
+context_selection=vdb.get_index_and_context_from_selection('Who made this?', 2, 'SubfolderOfLies')
 
-Output: " The quick brown fox jumps over the lazy dog."
+```
+The directory level and value structure is saved in 
+```python
+print(vdb.dlv)
+```
+
 
 Dependencies
 
 VDBforGenAI has the following dependencies:
 ```
-
-    Faiss
-    Transformers
-    Torch
-    Numpy
+        "faiss-cpu",
+        "transformers",
+        "torch",
+        "numpy","PyPDF2",'docx','python-docx
 ```
 
 
@@ -55,29 +62,6 @@ VDBforGenAI is licensed under the MIT License.
 
 
 
-## Create a VectorDatabase object with an initial list of strings
-```
-from VDBforGenAI import VectorDatabase
-initial_strings = [
-    "This is the first sentence. This is the second sentence.",
-    "This is another string with multiple sentences. Here's another sentence.",
-    "And here's yet another string with multiple sentences. This one has three sentences!"
-]
-vdb = VectorDatabase(initial_strings)
-```
-Add a new string with multiple sentences using the add_string_to_context method
-```
-new_string = "This is a new string with three sentences. Here's the second sentence. And here's the third!"
-vdb.add_string_to_context(new_string)
-```
-Add a new list of strings with multiple sentences using the add_list_of_strings_to_context method
-```
-new_list = [
-    "This is a new string with two sentences. Here's the second sentence.",
-    "This is another new string with multiple sentences. Here's the second sentence. And here's the third!"
-]
-vdb.add_list_of_strings_to_context(new_list)
-```
 ## Passing an encoder and tokenizer from Hugging Face's Transformers library:
 
 
@@ -85,12 +69,12 @@ vdb.add_list_of_strings_to_context(new_list)
 from transformers import AutoTokenizer, AutoModel
 from VDBforGenAI import VectorDatabase
 
-# Initialize the tokenizer and encoder
+[//]: # ( Initialize the tokenizer and encoder)
 tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
 encoder = AutoModel.from_pretrained('bert-base-uncased')
 
-# Initialize the VectorDatabase
-vdb = VectorDatabase(['some text'], encoder=encoder, tokenizer=tokenizer)
+[//]: # ( Initialize the VectorDatabase)
+vdb = VectorDatabase( encoder=encoder, tokenizer=tokenizer)
 
 ```
-Similarly, you can pass your own encoder as a torch model.
+Similarly, you can pass your own encoder as a torch model if you provide a tokenizer and the 0th output is the encoding.

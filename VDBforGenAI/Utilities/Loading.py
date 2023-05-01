@@ -6,21 +6,21 @@ def load_pdf(filename):
     # Open the PDF file
     with open(filename, 'rb') as file:
         # Create a PDF reader object
-        pdf_reader = PyPDF2.PdfFileReader(file)
+        pdf_reader = PyPDF2.PdfReader(file)
 
         # Create an empty string to hold the document text
         doc_text = ""
 
         # Loop over each page in the PDF file
-        for page_num in range(pdf_reader.getNumPages()):
+        for page_num in range(len(pdf_reader.pages)):
             # Get the page object
-            page = pdf_reader.getPage(page_num)
+            page = pdf_reader.pages[page_num]
 
             # Extract the text from the page and add it to the document text string
-            doc_text += page.extractText()
+            doc_text += page.extract_text()
 
-        # Return the document text string
-        return doc_text
+    # Return the document text string
+    return doc_text
 
 
 def load_docx(filename):
