@@ -16,13 +16,14 @@ from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
 
 class VectorDatabase:
     def __init__(self,
-                 encoder: Union[str, transformers.PreTrainedModel] = None,
+                 encoder: Union[str, transformers.PreTrainedModel, bool] = None,
                  tokenizer: Union[str, transformers.PreTrainedTokenizer] = None,
                  batch_size: int = 128,
                  splitting_choice: str = "length",
                  index_location: str = './index',
                  preload_index: bool = False,
-                 index_of_summarised_vector: int = 0
+                 index_of_summarised_vector: int = 0,
+                 hidden_size: int = False
                  ):
         """
 
@@ -53,7 +54,7 @@ class VectorDatabase:
 
         # This instantiates the dictionary holding the levels and their possible values (usually based on folder structure of import)
         self.dlv = None
-        if encoder is not None:
+        if encoder is not None and encoder is not False:
             if encoder is str:
                 self.encoder = AutoModel.from_pretrained(encoder)
                 if tokenizer is None:
@@ -66,7 +67,10 @@ class VectorDatabase:
         else:
             self.encoder = DPRContextEncoder.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
             self.tokenizer = DPRContextEncoderTokenizer.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
-        self.d = self.encoder.config.hidden_size
+        if hidden_size:
+            self.d = hidden_size
+        else:
+            self.d = self.encoder.config.hidden_size
 
         self.batch_size = batch_size
         self.splitting_choice = splitting_choice

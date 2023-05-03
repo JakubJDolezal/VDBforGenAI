@@ -1,6 +1,6 @@
 from VDBforGenAI.VectorDatabase import VectorDatabase
 # You instantiate a database and then tell it where to load (you can decide how you wish to split the strings, I would reccomend length for now)
-vdb = VectorDatabase(splitting_choice="length")
+vdb = VectorDatabase(encoder=False,splitting_choice="length")
 vdb.load_all_in_directory('./ExampleFolder')
 # Once you have a VectorDatabase instance, you can use the get_context_from_entire_database method to retrieve the context that is most similar to a given input text.
 

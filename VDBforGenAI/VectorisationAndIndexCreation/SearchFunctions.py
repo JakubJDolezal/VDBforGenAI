@@ -23,7 +23,6 @@ def search_database(search_vectors: numpy.array,
     :return: positions:positions from you document that match the query most closely
     """
     if index is None:
-        d = encoder.config.hidden_size
         index = faiss.IndexFlatIP(d)
         index.add(search_vectors)
     encoder.eval()
