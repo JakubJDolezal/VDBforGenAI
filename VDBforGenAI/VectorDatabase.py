@@ -23,7 +23,8 @@ class VectorDatabase:
                  index_location: str = './index',
                  preload_index: bool = False,
                  index_of_summarised_vector: int = 0,
-                 hidden_size: int = False
+                 hidden_size: int = False,
+                 retain_strings=True
                  ):
         """
 
@@ -35,8 +36,10 @@ class VectorDatabase:
         :param splitting_choice: What is the size of the context you wish to consider. Options are
         "paragraphs" and "sentence"
         :param preload_index: Whether you want to preload the index and keep it in memory
+        :param retain_strings: Whether you wish to retain the strings withing the VectorDatabase
         """
         self.index = None
+        self.retain_strings = retain_strings
         self.list_of_context_vectors_flattened = None
         self.map_to_list_of_lists = None
         self.map_to_list_of_lists_index = None
@@ -75,9 +78,7 @@ class VectorDatabase:
         self.batch_size = batch_size
         self.splitting_choice = splitting_choice
 
-    def reload_total_index(self):
-        self.index = faiss.IndexFlatIP(self.d)
-        self.index.add(self.list_of_context_vectors_flattened)
+    # Get relevant indices or pieces of text
 
     def get_context_from_entire_database(self, text, num_context=1):
         """
@@ -88,11 +89,12 @@ class VectorDatabase:
         """
         if self.index is not None:
             indices_returned = SearchFunctions.search_database(None, self.encoder, self.tokenizer, text,
-                                                               self.index_of_summarised_vector,
+                                                               self.index_of_summarised_vector, self.d,
                                                                num_samples=num_context, index=self.index)
         else:
             indices_returned = SearchFunctions.search_database(self.list_of_context_vectors_flattened, self.encoder,
                                                                self.tokenizer, text, self.index_of_summarised_vector,
+                                                               self.d,
                                                                num_samples=num_context)
         if num_context == 1:
             return self.list_of_lists_of_strings[int(self.map_to_list_of_lists[int(indices_returned)])][int(
@@ -113,11 +115,11 @@ class VectorDatabase:
         """
         if self.index is not None:
             indices_returned = SearchFunctions.search_database(None, self.encoder, self.tokenizer, text,
-                                                               self.index_of_summarised_vector,
+                                                               self.index_of_summarised_vector, self.d,
                                                                num_samples=num_context, index=self.index)
         else:
             indices_returned = SearchFunctions.search_database(self.list_of_context_vectors_flattened, self.encoder,
-                                                               self.tokenizer, text, self.index_of_summarised_vector,
+                                                               self.tokenizer, text, self.index_of_summarised_vector, self.d,
                                                                num_samples=num_context)
         if num_context == 1:
             return (int(self.map_to_list_of_lists[int(indices_returned)]), int(
@@ -140,7 +142,7 @@ class VectorDatabase:
         :return: string of the context that was found
         """
         indices_returned = SearchFunctions.search_database(None, self.encoder, self.tokenizer, text,
-                                                           self.index_of_summarised_vector,
+                                                           self.index_of_summarised_vector, self.d,
                                                            num_samples=num_context, index=loc_index)
         if num_context == 1:
             return self.list_of_lists_of_strings[int(selection_map_to_list_of_lists[int(indices_returned)])][int(
@@ -152,7 +154,7 @@ class VectorDatabase:
                 range(num_context)]
             return ' '.join(list_of_returned_contexts)
 
-    def get_index_and_context_from_selection(self, text: str, level: int, key: int, num_context=1):
+    def get_context_indices_from_selection(self, text: str, level: int, key: int, num_context=1):
         """
 
         :param text: the prompt text
@@ -176,12 +178,17 @@ class VectorDatabase:
     def add_string_to_context(self, string, preload_index=None, dlv_handled=False):
         if preload_index is None:
             preload_index = self.index_loaded
-        if self.list_of_lists_of_strings is None:
+        if self.list_of_context_vectors_flattened is None:
             self.initial_string_addition([string])
             previous_length = 0
         else:
-            previous_length = len(self.list_of_lists_of_strings)
-            self.list_of_lists_of_strings.extend(self.split_list_of_strings_into_lists_of_lists_of_strings([string]))
+            previous_length = self.map_to_list_of_lists[-1] + 1
+            if self.retain_strings:
+                self.list_of_lists_of_strings.extend(
+                    self.split_list_of_strings_into_lists_of_lists_of_strings([string]))
+            else:
+                self.list_of_lists_of_strings = self.split_list_of_strings_into_lists_of_lists_of_strings([string])
+
             self.map_to_list_of_lists = np.concatenate(
                 [self.map_to_list_of_lists, np.repeat(previous_length, len(self.list_of_lists_of_strings[-1]))])
             self.map_to_list_of_lists_index = np.concatenate(
@@ -193,6 +200,9 @@ class VectorDatabase:
                                                                        self.batch_size, self.index_of_summarised_vector)
             self.list_of_context_vectors_flattened = np.concatenate([self.list_of_context_vectors_flattened,
                                                                      vector_list_of_string], axis=0)
+        if self.retain_strings == False:
+            self.list_of_lists_of_strings = None
+
         if preload_index:
             self.reload_total_index()
         else:
@@ -204,17 +214,16 @@ class VectorDatabase:
         if preload_index:
             preload_index = self.index_loaded
 
-        if self.list_of_lists_of_strings is None:
-            self.initial_string_addition([new_list_of_strings])
+        if self.list_of_context_vectors_flattened is None:
+            self.initial_string_addition(new_list_of_strings)
             previous_length = 0
-
         else:
-            previous_length = len(self.list_of_lists_of_strings)
+            previous_length = self.map_to_list_of_lists[-1] + 1
             new_list_of_list_of_strings = self.split_list_of_strings_into_lists_of_lists_of_strings(new_list_of_strings)
             list_list_of_vectors = [
                 SearchFunctions.vectorise_to_numpy(self.encoder, self.tokenizer, new_list_of_list_of_strings[i],
                                                    self.batch_size, self.index_of_summarised_vector) for i in
-                range(len(self.list_of_lists_of_strings))]
+                range(len(new_list_of_strings))]
             lengths = [len(lst) for lst in list_list_of_vectors]
             # create an array of indices indicating which original list each element in the flattened list corresponds to
             new_map_to_list_of_lists = np.concatenate([np.repeat(i, l) for i, l in enumerate(lengths)])
@@ -222,7 +231,9 @@ class VectorDatabase:
                 [np.linspace(0, l, num=l, endpoint=False) for i, l in enumerate(lengths)])
             new_list_of_context_vectors_flattened = np.concatenate(list_list_of_vectors, axis=0)
 
-            self.list_of_lists_of_strings.extend(new_list_of_list_of_strings)
+            if self.retain_strings:
+                self.list_of_lists_of_strings.extend(new_list_of_list_of_strings)
+
             self.map_to_list_of_lists = np.concatenate(
                 [self.map_to_list_of_lists, new_map_to_list_of_lists])
             self.map_to_list_of_lists_index = np.concatenate(
@@ -239,7 +250,8 @@ class VectorDatabase:
                 self.add_to_dlv({0: 'String' + str(previous_length + i)})
 
     def initial_string_addition(self, list_of_strings):
-        self.list_of_lists_of_strings = self.split_list_of_strings_into_lists_of_lists_of_strings(list_of_strings)
+        if self.retain_strings:
+            self.list_of_lists_of_strings = self.split_list_of_strings_into_lists_of_lists_of_strings(list_of_strings)
         list_list_of_vectors = [
             SearchFunctions.vectorise_to_numpy(self.encoder, self.tokenizer, self.list_of_lists_of_strings[i],
                                                self.batch_size, self.index_of_summarised_vector) for i in
@@ -250,6 +262,91 @@ class VectorDatabase:
         self.map_to_list_of_lists_index = np.concatenate(
             [np.linspace(0, l, num=l, endpoint=False) for i, l in enumerate(lengths)])
         self.list_of_context_vectors_flattened = np.concatenate(list_list_of_vectors, axis=0)
+
+    def add_string_to_context_with_precalculated_vector(self, string, vectors, preload_index=None, dlv_handled=False,
+                                                        presplit=False):
+        if preload_index is None:
+            preload_index = self.index_loaded
+        if self.list_of_context_vectors_flattened is None:
+            self.initial_string_addition_with_precalculated_vector([string], [vectors.numpy()])
+            previous_length = 0
+        else:
+            previous_length = len(self.list_of_context_vectors_flattened)
+            if self.retain_strings:
+
+                if not presplit:
+                    self.list_of_lists_of_strings.extend(
+                        self.split_list_of_strings_into_lists_of_lists_of_strings([string]))
+                else:
+                    self.list_of_lists_of_strings.extend(string)
+
+            self.map_to_list_of_lists = np.concatenate(
+                [self.map_to_list_of_lists, np.repeat(previous_length, len(self.list_of_lists_of_strings[-1]))])
+            self.map_to_list_of_lists_index = np.concatenate(
+                [self.map_to_list_of_lists_index, np.linspace(0, len(self.list_of_lists_of_strings[-1]),
+                                                              num=len(self.list_of_lists_of_strings[-1]),
+                                                              endpoint=False)])
+            vector_list_of_string = vectors.numpy()
+            self.list_of_context_vectors_flattened = np.concatenate([self.list_of_context_vectors_flattened,
+                                                                     vector_list_of_string], axis=0)
+        if preload_index:
+            self.reload_total_index()
+        else:
+            self.index_loaded = False
+        if not dlv_handled:
+            self.add_to_dlv({0: 'String ' + str(previous_length)})
+
+    def add_list_of_strings_to_context_with_precalculated_vectors(self, new_list_of_strings, vectors,
+                                                                  preload_index=None, dlv_handled=False,
+                                                                  presplit=False):
+        if preload_index:
+            preload_index = self.index_loaded
+
+        if self.list_of_lists_of_strings is None:
+            self.initial_string_addition_with_precalculated_vector(new_list_of_strings, vectors)
+            previous_length = 0
+
+        else:
+            previous_length = len(self.list_of_context_vectors_flattened)
+            lengths = [len(lst) for lst in vectors]
+            # create an array of indices indicating which original list each element in the flattened list corresponds to
+            new_map_to_list_of_lists = np.concatenate([np.repeat(i, l) for i, l in enumerate(lengths)])
+            new_map_to_list_of_lists_index = np.concatenate(
+                [np.linspace(0, l, num=l, endpoint=False) for i, l in enumerate(lengths)])
+            new_list_of_context_vectors_flattened = np.concatenate(vectors, axis=0)
+
+            if self.retain_strings:
+                if not presplit:
+                    self.list_of_lists_of_strings.extend(
+                        self.split_list_of_strings_into_lists_of_lists_of_strings(new_list_of_strings))
+                else:
+                    self.list_of_lists_of_strings.extend(new_list_of_strings)
+            self.map_to_list_of_lists = np.concatenate(
+                [self.map_to_list_of_lists, new_map_to_list_of_lists])
+            self.map_to_list_of_lists_index = np.concatenate(
+                [self.map_to_list_of_lists_index, new_map_to_list_of_lists_index])
+            self.list_of_context_vectors_flattened = np.concatenate([self.list_of_context_vectors_flattened,
+                                                                     new_list_of_context_vectors_flattened], axis=0)
+            if preload_index:
+                self.reload_total_index()
+            else:
+                self.index_loaded = False
+
+        if not dlv_handled:
+            for i in range(len(new_list_of_strings)):
+                self.add_to_dlv({0: 'String' + str(previous_length + i)})
+
+    def initial_string_addition_with_precalculated_vector(self, list_of_strings, vectors):
+        if self.retain_strings:
+            self.list_of_lists_of_strings = list_of_strings
+        lengths = [len(lst) for lst in vectors]
+        # create an array of indices indicating which original list each element in the flattened list corresponds to
+        self.map_to_list_of_lists = np.concatenate([np.repeat(i, l) for i, l in enumerate(lengths)])
+        self.map_to_list_of_lists_index = np.concatenate(
+            [np.linspace(0, l, num=l, endpoint=False) for i, l in enumerate(lengths)])
+        self.list_of_context_vectors_flattened = np.concatenate(vectors, axis=0)
+
+    # String splitting function
 
     def split_list_of_strings_into_lists_of_lists_of_strings(self, input_list: list, splitting_choice: str = None,
                                                              max_length: int = 500):
@@ -301,7 +398,9 @@ class VectorDatabase:
             # Return the input list as is but make into list of lists of single strings for consistency, i.e. whole documents
             return [[input_list[i]] for i in range(0, len(input_list))]
 
-    def load_pdf(self, filename, divide_by_filepath=None):
+    # Loading functions for files and lists of strings
+
+    def load_pdf(self, filename, divide_by_filepath=None, preload_index=None):
         """
         loads the pdf, adds it to all the arrays and the dictionary of levels and values
         :param filename: The pdf to load
@@ -312,12 +411,12 @@ class VectorDatabase:
         self.add_to_filenames(filename)
         if divide_by_filepath:
             filename_divided = split_string_to_dict(filename)
-            self.add_string_to_context(pdf_string, dlv_handled=True)
+            self.add_string_to_context(pdf_string, dlv_handled=True, preload_index=preload_index)
             self.add_to_dlv(filename_divided)
         else:
             self.add_string_to_context(pdf_string)
 
-    def load_docx(self, filename, divide_by_filepath=True):
+    def load_docx(self, filename, divide_by_filepath=True, preload_index=None):
         """
         loads the docx, adds it to all the arrays and the dictionary of levels and values
         :param filename: The docx to load
@@ -328,12 +427,12 @@ class VectorDatabase:
         self.add_to_filenames(filename)
         if divide_by_filepath:
             filename_divided = split_string_to_dict(filename)
-            self.add_string_to_context(word_string, dlv_handled=True)
+            self.add_string_to_context(word_string, dlv_handled=True, preload_index=preload_index)
             self.add_to_dlv(filename_divided)
         else:
             self.add_string_to_context(word_string)
 
-    def load_txt(self, filename, divide_by_filepath=True):
+    def load_txt(self, filename, divide_by_filepath=True, preload_index=None):
         """
         loads the txt, adds it to all the arrays and the dictionary of levels and values
         :param filename: The txt to load
@@ -346,28 +445,62 @@ class VectorDatabase:
         self.add_to_filenames(filename)
         if divide_by_filepath:
             filename_divided = split_string_to_dict(filename)
-            self.add_string_to_context(txt_string, dlv_handled=True)
+            self.add_string_to_context(txt_string, dlv_handled=True, preload_index=preload_index)
             self.add_to_dlv(filename_divided)
         else:
             self.add_string_to_context(txt_string)
 
-    def load_string_list_with_divisions(self, string_list, divisions):
+    def load_string_list_with_divisions(self, string_list, divisions, filenames=None):
+        if filenames == None:
+            filenames = [''] * len(string_list)
+        preload_index = False
         for i in range(0, len(string_list)):
-            self.add_to_filenames('')
+            if i == len(string_list) - 1:
+                preload_index = None
+            self.add_to_filenames(filenames[i])
             self.add_to_dlv(divisions[i])
-            self.add_string_to_context(string_list[i], dlv_handled=True)
+            self.add_string_to_context(string_list[i], dlv_handled=True, preload_index=preload_index)
+
+    def load_string_list_with_divisions_and_vectors(self, string_list, divisions, vectors, filenames=None):
+        """
+
+        :param string_list: list of strings we wish to add
+        :param divisions: list of divisions we wish to use in these strings (could be folder structure or anything else)
+        :param vectors: torch tensor of precalculated vectors
+        :param filenames: optional list of filenames where we got these string lists from
+        :return:
+        """
+        if filenames == None:
+            filenames = [''] * len(string_list)
+        for i in range(0, len(string_list)):
+            self.add_to_filenames(filenames[i])
+            self.add_to_dlv(divisions[i])
+        self.add_list_of_strings_to_context_with_precalculated_vectors(string_list, vectors, dlv_handled=True,
+                                                                         presplit=True)
 
     def load_pdf_list(self, list_of_filenames, divide_by_filepath=True):
-        for item in list_of_filenames:
-            self.load_pdf(item, divide_by_filepath)
+        preload_index = False
+        for i in range(len(list_of_filenames)):
+            item = list_of_filenames[i]
+            if i == len(list_of_filenames) - 1:
+                preload_index = None
+            self.load_pdf(item, divide_by_filepath, preload_index=preload_index)
 
     def load_docx_list(self, list_of_filenames, divide_by_filepath=True):
-        for item in list_of_filenames:
-            self.load_docx(item, divide_by_filepath)
+        preload_index = False
+        for i in range(len(list_of_filenames)):
+            item = list_of_filenames[i]
+            if i == len(list_of_filenames) - 1:
+                preload_index = None
+            self.load_docx(item, divide_by_filepath, preload_index=preload_index)
 
     def load_txt_list(self, list_of_filenames, divide_by_filepath=True):
-        for item in list_of_filenames:
-            self.load_txt(item, divide_by_filepath)
+        preload_index = False
+        for i in range(len(list_of_filenames)):
+            item = list_of_filenames[i]
+            if i == len(list_of_filenames) - 1:
+                preload_index = None
+            self.load_txt(item, divide_by_filepath, preload_index=preload_index)
 
     def load_all_in_directory(self, directory):
         """
@@ -376,7 +509,7 @@ class VectorDatabase:
         :return:
         """
         docx_docs = []
-        doc_docs = []
+        # doc_docs = []
         txt_docs = []
         pdf_docs = []
 
@@ -396,6 +529,8 @@ class VectorDatabase:
         self.load_docx_list(docx_docs)
         self.load_txt_list(txt_docs)
 
+    # Loading/reloading and saving faiss index
+
     def save_index(self):
         faiss.write_index(self.index, self.index_loc)
 
@@ -404,9 +539,14 @@ class VectorDatabase:
         self.index = None
         self.index_loaded = False
 
-    # Load the index from the file
     def load_index(self):
         self.index = faiss.read_index(self.index_loc)
+
+    def reload_total_index(self):
+        self.index = faiss.IndexFlatIP(self.d)
+        self.index.add(self.list_of_context_vectors_flattened)
+
+    # Dealing with the the divided levels and values
 
     def add_to_dlv(self, filename_divided):
         """
@@ -432,6 +572,31 @@ class VectorDatabase:
                     self.dlv[i] = np.concatenate(
                         (self.dlv[i], np.array([self.list_dict_value_num[i][filename_divided[i]]])))
 
+    def add_list_to_dlv(self, List_filename_divided):
+        """
+        Adds list of divided filenames into the dictionary of divided levels and values(dlv)
+        :param filename_divided:
+        :return:
+        """
+        if self.dlv is None:
+            self.make_dlv_base()
+
+        done = []
+        for i in List_filename_divided[0].keys():
+            if i not in self.dlv.keys():
+                self.add_dlv_level(i)
+                done.append(i)
+            if List_filename_divided[i] not in self.list_dict_value_num[i].keys():
+                self.list_dict_value_num[i][List_filename_divided[i]] = len(self.list_dict_value_num[i].keys())
+        for j in range(0,len(List_filename_divided)):
+            for i in self.dlv.keys():
+                if i not in done:
+                    if i not in List_filename_divided[j].keys():
+                        self.dlv[i] = np.concatenate((self.dlv[i], np.array([-1])))
+                    else:
+                        self.dlv[i] = np.concatenate(
+                            (self.dlv[i], np.array([self.list_dict_value_num[i][List_filename_divided[j][i]]])))
+
     def add_to_filenames(self, filename):
         if self.list_locations is None:
             self.list_locations = []
@@ -451,9 +616,9 @@ class VectorDatabase:
         :param i: the level to add
         :return:
         """
-        if len(self.list_of_lists_of_strings) == 1:
+        if self.map_to_list_of_lists[0] == 0:
             self.dlv[i] = np.zeros(1)
             self.list_dict_value_num[i] = {}
         else:
-            self.dlv[i] = np.zeros(len(self.list_of_lists_of_strings)) - 1
+            self.dlv[i] = np.zeros(self.map_to_list_of_lists[0])
             self.list_dict_value_num[i] = {}

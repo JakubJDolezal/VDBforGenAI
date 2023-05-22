@@ -10,8 +10,10 @@ def search_database(search_vectors: numpy.array,
                     tokenizer: transformers.PreTrainedTokenizer,
                     text: str,
                     index_of_summarised_vector: int,
+                    search_dimension: int,
                     num_samples: int = 2,
-                    index: faiss.Index = None):
+                    index: faiss.Index = None,
+                    ):
     """
 
     :param search_vectors: The vectors you wish to search over
@@ -23,7 +25,7 @@ def search_database(search_vectors: numpy.array,
     :return: positions:positions from you document that match the query most closely
     """
     if index is None:
-        index = faiss.IndexFlatIP(d)
+        index = faiss.IndexFlatIP(search_dimension)
         index.add(search_vectors)
     encoder.eval()
     data = tokenizer.encode_plus(
