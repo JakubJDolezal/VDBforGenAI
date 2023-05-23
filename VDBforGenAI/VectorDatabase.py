@@ -24,7 +24,7 @@ class VectorDatabase:
                  preload_index: bool = False,
                  index_of_summarised_vector: int = 0,
                  hidden_size: int = False,
-                 retain_strings=True
+                 retain_strings = True
                  ):
         """
 
@@ -34,7 +34,7 @@ class VectorDatabase:
         facebook/dpr-ctx_encoder-single-nq-base, can be a different location than the model
         :param batch_size: Batch size for encoding
         :param splitting_choice: What is the size of the context you wish to consider. Options are
-        "paragraphs" and "sentence"
+        "paragraphs" and "sentence", 'length'
         :param preload_index: Whether you want to preload the index and keep it in memory
         :param retain_strings: Whether you wish to retain the strings withing the VectorDatabase
         """
@@ -144,22 +144,44 @@ class VectorDatabase:
         indices_returned = SearchFunctions.search_database(None, self.encoder, self.tokenizer, text,
                                                            self.index_of_summarised_vector, self.d,
                                                            num_samples=num_context, index=loc_index)
-        if num_context == 1:
-            return self.list_of_lists_of_strings[int(selection_map_to_list_of_lists[int(indices_returned)])][int(
-                selection_map_to_list_of_lists_index[int(indices_returned)])]
-        else:
-            list_of_returned_contexts = [
-                self.list_of_lists_of_strings[int(selection_map_to_list_of_lists[indices_returned[i]])][
-                    int(selection_map_to_list_of_lists_index[indices_returned[i]])] for i in
-                range(num_context)]
-            return ' '.join(list_of_returned_contexts)
 
-    def get_context_indices_from_selection(self, text: str, level: int, key: int, num_context=1):
+        return indices_returned
+
+    def get_context_indices_from_selection(self, text: str, level: int, key: str, num_context=1):
         """
 
         :param text: the prompt text
-        :param level: which level we
-        :param key:
+        :param level: which level we want
+        :param key: which key on this level we want (often either directory or file)
+        :param num_context: how many instances of context you want
+        :return: string of context
+        """
+        selection = self.dlv[level] == self.list_dict_value_num[level][key]
+        selection_map_to_list_of_lists = self.map_to_list_of_lists[
+            np.isin(self.map_to_list_of_lists, np.argwhere(selection))]
+        selection_map_to_list_of_lists_index = self.map_to_list_of_lists_index[
+            np.isin(self.map_to_list_of_lists, np.argwhere(selection))]
+        selection_list_of_context_vectors_flattened = self.list_of_context_vectors_flattened[
+            np.isin(self.map_to_list_of_lists, np.argwhere(selection))]
+        loc_index = faiss.IndexFlatIP(self.d)
+        loc_index.add(selection_list_of_context_vectors_flattened)
+        indices_returned=self.get_context_from_index(text, loc_index, selection_map_to_list_of_lists,
+                                           selection_map_to_list_of_lists_index, num_context=num_context)
+        if num_context == 1:
+            return (int(selection_map_to_list_of_lists[int(indices_returned)]), int(
+                selection_map_to_list_of_lists_index[int(indices_returned)]))
+        else:
+            list_of_returned_context_indices = [(int(selection_map_to_list_of_lists[indices_returned[i]]),
+                                                 int(selection_map_to_list_of_lists_index[indices_returned[i]])) for i in
+                                                range(num_context)]
+            return list_of_returned_context_indices
+
+    def get_context_from_selection(self, text: str, level: int, key: str, num_context=1):
+        """
+
+        :param text: the prompt text
+        :param level: which level we want
+        :param key: which key on this level we want (often either directory or file)
         :param num_context: how many instances of context you want
         :return: string of context
         """
@@ -172,8 +194,17 @@ class VectorDatabase:
             np.isin(self.map_to_list_of_lists, np.argwhere(selection))]
         loc_index = faiss.IndexFlatIP(self.d)
         loc_index.add(selection_list_of__context_vectors_flattened)
-        return self.get_context_from_index(text, loc_index, selection_map_to_list_of_lists,
+        indices_returned=self.get_context_from_index(text, loc_index, selection_map_to_list_of_lists,
                                            selection_map_to_list_of_lists_index, num_context=num_context)
+        if num_context == 1:
+            return self.list_of_lists_of_strings[int(selection_map_to_list_of_lists[int(indices_returned)])][int(
+                selection_map_to_list_of_lists_index[int(indices_returned)])]
+        else:
+            list_of_returned_contexts = [
+                self.list_of_lists_of_strings[int(selection_map_to_list_of_lists[indices_returned[i]])]
+                                                 [int(selection_map_to_list_of_lists_index[indices_returned[i]])] for i in
+                                                range(num_context)]
+            return ' '.join(list_of_returned_contexts)
 
     def add_string_to_context(self, string, preload_index=None, dlv_handled=False):
         if preload_index is None:
@@ -262,6 +293,8 @@ class VectorDatabase:
         self.map_to_list_of_lists_index = np.concatenate(
             [np.linspace(0, l, num=l, endpoint=False) for i, l in enumerate(lengths)])
         self.list_of_context_vectors_flattened = np.concatenate(list_list_of_vectors, axis=0)
+
+    # In construction section
 
     def add_string_to_context_with_precalculated_vector(self, string, vectors, preload_index=None, dlv_handled=False,
                                                         presplit=False):
@@ -461,6 +494,8 @@ class VectorDatabase:
             self.add_to_dlv(divisions[i])
             self.add_string_to_context(string_list[i], dlv_handled=True, preload_index=preload_index)
 
+    # In construction function
+
     def load_string_list_with_divisions_and_vectors(self, string_list, divisions, vectors, filenames=None):
         """
 
@@ -551,7 +586,7 @@ class VectorDatabase:
     def add_to_dlv(self, filename_divided):
         """
         Adds the divided filename into the dictionary of divided levels and values(dlv)
-        :param filename_divided:
+        :param filename_divided: the categories/folders this is in
         :return:
         """
         if self.dlv is None:
@@ -572,30 +607,30 @@ class VectorDatabase:
                     self.dlv[i] = np.concatenate(
                         (self.dlv[i], np.array([self.list_dict_value_num[i][filename_divided[i]]])))
 
-    def add_list_to_dlv(self, List_filename_divided):
+    def add_list_to_dlv(self, list_filename_divided):
         """
         Adds list of divided filenames into the dictionary of divided levels and values(dlv)
-        :param filename_divided:
+        :param list_filename_divided: list of the categories, I presume the first one has all the categories
         :return:
         """
         if self.dlv is None:
             self.make_dlv_base()
 
         done = []
-        for i in List_filename_divided[0].keys():
+        for i in list_filename_divided[0].keys():
             if i not in self.dlv.keys():
                 self.add_dlv_level(i)
                 done.append(i)
-            if List_filename_divided[i] not in self.list_dict_value_num[i].keys():
-                self.list_dict_value_num[i][List_filename_divided[i]] = len(self.list_dict_value_num[i].keys())
-        for j in range(0,len(List_filename_divided)):
+            if list_filename_divided[i] not in self.list_dict_value_num[i].keys():
+                self.list_dict_value_num[i][list_filename_divided[i]] = len(self.list_dict_value_num[i].keys())
+        for j in range(0,len(list_filename_divided)):
             for i in self.dlv.keys():
                 if i not in done:
-                    if i not in List_filename_divided[j].keys():
+                    if i not in list_filename_divided[j].keys():
                         self.dlv[i] = np.concatenate((self.dlv[i], np.array([-1])))
                     else:
                         self.dlv[i] = np.concatenate(
-                            (self.dlv[i], np.array([self.list_dict_value_num[i][List_filename_divided[j][i]]])))
+                            (self.dlv[i], np.array([self.list_dict_value_num[i][list_filename_divided[j][i]]])))
 
     def add_to_filenames(self, filename):
         if self.list_locations is None:
@@ -616,9 +651,10 @@ class VectorDatabase:
         :param i: the level to add
         :return:
         """
-        if self.map_to_list_of_lists[0] == 0:
+        if self.map_to_list_of_lists[-1] == 0:
             self.dlv[i] = np.zeros(1)
             self.list_dict_value_num[i] = {}
         else:
-            self.dlv[i] = np.zeros(self.map_to_list_of_lists[0])
+            self.dlv[i] = np.zeros(self.map_to_list_of_lists[-1]+1)-1
+            self.dlv[i][-1]=0
             self.list_dict_value_num[i] = {}

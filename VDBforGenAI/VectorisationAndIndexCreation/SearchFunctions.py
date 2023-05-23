@@ -71,8 +71,5 @@ def vectorise_to_numpy(
         all_embeddings.append(vectors[index_of_summarised_vector])
 
     # Concatenate the embeddings for all batches
-    if batch_size < len(input_strings):
-        all_embeddings = all_embeddings[0].numpy()
-    else:
-        all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
+    all_embeddings = torch.cat(all_embeddings, dim=0).numpy()
     return all_embeddings
