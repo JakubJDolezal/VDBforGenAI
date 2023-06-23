@@ -868,7 +868,7 @@ def get_context_from_selection(text: str, level: int, key: str, encoder: transfo
         return ' '.join(list_of_returned_contexts)
 
 
-def get_all_relevant_contracts(list_of_lens_summed: list, text: str, level: int,
+def get_all_relevant_text(list_of_lens_summed: list, text: str, level: int,
                                encoder: transformers.PreTrainedModel,
                                tokenizer: transformers.PreTrainedTokenizer, dlv: dict,
                                list_dict_value_num: list,
@@ -946,7 +946,7 @@ def get_all_relevant_contracts(list_of_lens_summed: list, text: str, level: int,
     return sorted_candidates
 
 
-def get_relevant_contracts_above_cutoff(list_of_lens_summed: list, text: str, level: int,
+def get_relevant_documents_above_cutoff(list_of_lens_summed: list, text: str, level: int,
                                         encoder: transformers.PreTrainedModel,
                                         tokenizer: transformers.PreTrainedTokenizer, dlv: dict,
                                         list_dict_value_num: list,
